@@ -1,0 +1,14 @@
+name: Build and forecast check
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - run: dotnet build Aether.Api/Aether.Api.csproj --configuration Release
+      - run: dotnet run --project Aether.Api --configuration Release --no-build -- --forecast-self-test

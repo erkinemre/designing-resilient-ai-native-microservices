@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16.6
+    environment:
+      POSTGRES_USER: aether
+      POSTGRES_PASSWORD: aether_dev_only
+      POSTGRES_DB: aether
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aether -d aether"]
+      interval: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    environment:
+      RABBITMQ_DEFAULT_USER: aether
+      RABBITMQ_DEFAULT_PASS: aether_dev_only
+    ports:
+      - "15672:15672"
+    volumes:
+      - rabbit-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      retries: 20
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Database=aether;Username=aether;Password=aether_dev_only
+      ROLE: api
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+
+  worker:
+    build: .
+    environment:
+      ConnectionStrings__Postgres: Host=postgres;Database=aether;Username=aether;Password=aether_dev_only
+      RABBITMQ_URL: amqp://aether:aether_dev_only@rabbitmq:5672/
+      ROLE: worker
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:
+  rabbit-data:
